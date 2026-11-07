@@ -1,113 +1,155 @@
 # Fluenta
 
-A custom Discord client for **Windows** and **Android**.
+A **Discord client mod** in the style of Vencord — it patches the official Discord
+desktop app you already have installed, so there is no token to paste, no bot
+account, and no second client to keep logged in.
 
-Fluenta is a real client: it authenticates against Discord, loads your servers and
-direct messages, receives live events over the Discord Gateway, and sends,
-edits, reacts to and deletes real messages. There are no mocks, fixtures or fake
-data anywhere in the app — every screen is driven by live Discord API responses.
+Fluenta is two things in one repo:
 
-![Fluenta](public/icon.png)
+| Part | What it is | Platforms |
+| --- | --- | --- |
+| **`mod/`** | The client mod: injector + renderer patcher + plugin system that runs inside Discord | Windows (Stable / PTB / Canary) |
+| **`src/`** | A standalone client used for mobile and web, talking to Discord's REST + Gateway | Android (Capacitor), Web |
 
-## What it does
+The mod needs **no credentials at all** — it runs inside your normal, already
+signed-in Discord.
 
-| Area | Support |
-| --- | --- |
-| Auth | User tokens and bot tokens, validated with `GET /users/@me` |
-| Gateway v10 | Identify, heartbeat, resume, reconnect with exponential backoff |
-| Servers | Guild list, guild icons, text/announcement/forum channels |
-| DMs | Direct and group DM channels |
-| Messages | 50-message history pages with infinite scroll, send, edit, delete, reply |
-| Live events | `MESSAGE_CREATE/UPDATE/DELETE`, `TYPING_START`, reactions, channel + guild updates |
-| Rendering | Markdown (bold/italic/strike/underline), code blocks, spoilers, mentions, custom emoji, `<t:…>` timestamps, links |
-| Attachments | Images, video, audio and file cards, plus basic embed rendering |
-| Reactions | Live counts, click to add/remove, quick emoji picker |
-| Members | Guild member list with role colours |
-| Platform | Windows (Tauri v2), Android (Capacitor 7), and a plain web build |
+---
 
-## Architecture
+## The mod
 
-```
-src/
-  lib/
-    api.ts        typed REST client (rate-limit aware, 429 retry)
-    gateway.ts    Discord Gateway v10 websocket client
-    transport.ts  browser fetch / Tauri HTTP / Capacitor HTTP
-    store.ts      zustand state, gateway event reducer
-    markdown.tsx  Discord-flavoured markdown → React nodes (no innerHTML)
-    types.ts      Discord object types used by the client
-  components/     Login, GuildBar, ChannelSidebar, Chat, MessageRow, Composer, MemberList, Settings
-src-tauri/        Windows desktop shell (Rust + Tauri 2)
-android/          Android shell (Capacitor 7, generated with `cap add android`)
-tools/gen-icons.mjs  generates the PNG/ICO icon set (no dependencies)
-```
+### How it works
 
-There is **no backend**. The client talks straight to `https://discord.com/api/v10`
-and `wss://gateway.discord.gg`. The token is stored in `localStorage` on the
-device and sent only to Discord.
+1. `mod/dist/cli.cjs install` finds your Discord installation
+   (`%LOCALAPPDATA%\Discord\app-*\resources` on Windows).
+2. It extracts `resources/app.asar` into `resources/app/` and renames the original
+   archive to `app.asar.fluenta-backup` so Electron loads the patched directory.
+3. Discord's `app/index.js` gets a loader prepended that requires
+   `./fluenta/desktop.js`.
+4. That main-process loader runs `renderer.js` inside Discord's window once the
+   page loads. The renderer resolves Discord's own webpack modules and starts the
+   plugins.
+5. Everything is reversible: `uninstall` deletes the patched directory and puts
+   the untouched `app.asar` back.
 
-Native shells use their platform HTTP stacks (`tauri-plugin-http`,
-`CapacitorHttp`) so requests are not subject to WebView CORS rules.
+No network interception, no separate account, no data leaves your machine.
 
-## Run it
-
-Requires Node 20+.
+### Install
 
 ```bash
 npm install
-npm run dev            # web build at http://localhost:3000
+npm run mod:install     # build + patch every Discord install it finds
 ```
 
-Sign in with your Discord token, or tick “This is a bot token” and paste a bot
-token.
-
-> Where to get a token: a user token lives in the Discord client's local storage
-> (`localStorage.getItem('token')` in the web app's devtools) — and using it with
-> third-party clients is against Discord's Terms of Service. Bot tokens are
-> created in the [Discord Developer Portal](https://discord.com/developers/applications)
-> and the same app works with them; bots additionally need the
-> **Message Content** privileged intent to read message text.
-
-## Build for Windows
-
-Prerequisites: Rust toolchain (`rustup`), Visual Studio C++ build tools, WebView2
-(shipped with Windows 11).
+Then fully quit Discord (tray icon → Quit — closing the window is not enough)
+and start it again. Press **Ctrl+Shift+F** or click the **F** button in the
+bottom-left corner to open the Fluenta panel.
 
 ```bash
-npm install
-npm run icons          # generate icon set (already committed, safe to re-run)
-npm run windows:build  # produces MSI + NSIS installers in src-tauri/target/release/bundle
-npm run windows:dev    # hot-reload desktop window
+npm run mod:status      # show detected installs and patch state
+npm run mod:uninstall   # restore Discord exactly as it was
 ```
 
-## Build for Android
-
-Prerequisites: Android Studio (SDK 35 + build tools), JDK 17+.
+If Discord is installed elsewhere (or you want to target a specific branch):
 
 ```bash
-npm install
-npm run android:build  # vite build + `cap sync android`
-npm run android:open   # opens the project in Android Studio
+node mod/dist/cli.cjs install --dir "C:\path\to\Discord\resources"
 ```
 
-Then run ▶ from Android Studio, or `cd android && ./gradlew assembleDebug` to get
-`android/app/build/outputs/apk/debug/app-debug.apk`.
+### Plugins
 
-## Configuration
+| Plugin | Default | What it does |
+| --- | --- | --- |
+| Custom theme | on | Injects your own CSS, editable in the Theme tab |
+| Hide Nitro upsells | on | Hides gift/shop/Nitro promo surfaces |
+| Message logger | off | Keeps deleted and edited messages locally (last 1000), exportable as JSON |
+| Keyword highlight | off | Tints messages matching your comma-separated keywords |
 
-| Variable | Purpose |
-| --- | --- |
-| `VITE_ALLOWED_HOST` | Optional extra hostname allowed by the Vite dev server (used for cloud previews) |
+Plugins are isolated: a plugin that fails to start is reported in the panel and
+the rest keep working. Enabled state and settings live in `localStorage`.
+
+Adding a plugin is a single file — see `mod/src/renderer/plugins/hideNitro.ts`
+for the smallest example:
+
+```ts
+export const myPlugin: PluginDefinition = {
+  id: 'myPlugin',
+  name: 'My plugin',
+  description: 'What it does.',
+  start(ctx) {
+    const off = ctx.subscribe('MESSAGE_CREATE', (payload) => ctx.log(payload.message.id))
+    return () => off() // cleanup when disabled
+  },
+}
+```
+
+Then add it to `allPlugins` in `mod/src/renderer/plugins/index.ts`.
+
+### Mod development
+
+```bash
+npm run mod:build       # mod/dist/{desktop.js,renderer.js,cli.cjs}
+npm run mod:typecheck   # tsc over mod/
+npm run mod:test        # unit tests
+npm run mod:install     # rebuild + patch
+```
+
+`mod:test` covers the injector end-to-end against a real `app.asar` built with
+`@electron/asar` (install → patched `index.js` → backup → uninstall restores the
+original bytes) and the webpack patcher (module discovery by export shape,
+throwing modules, Flux subscribe/unsubscribe).
+
+---
+
+## The mobile/web client
+
+Android can't be modded the way the desktop app can without re-signing Discord's
+APK, so Fluenta ships its own client for mobile — a real one built on the live
+Discord API (no mocks):
+
+```bash
+npm run dev             # web at http://localhost:3000
+npm run build           # production bundle
+npm run android:build   # vite build + capacitor sync
+npm run android:open    # open the Android project in Android Studio
+```
+
+Prerequisites for Android: Android Studio (SDK 35, JDK 17+). Then build
+`android/app/build/outputs/apk/debug/app-debug.apk` from Android Studio or
+`cd android && ./gradlew assembleDebug`.
+
+Sign in with a Discord token (bot tokens work too). This part *does* use
+credentials — it is a client, not a mod.
+
+---
+
+## Repo layout
+
+```
+mod/
+  src/injector/      app.asar detection, patching, restore
+  src/shared/        install path discovery (Windows/macOS/Linux)
+  src/main/          Electron main-process loader
+  src/renderer/      webpack patcher, plugin registry, panel UI, plugins
+  tests/             injector + patcher tests
+src/                 standalone client (React + zustand)
+src-tauri/           Windows desktop shell for the standalone client
+android/             Capacitor Android project
+tools/gen-icons.mjs  dependency-free PNG/ICO icon generator
+```
 
 ## Notes and limits
 
-- Fluenta is an unofficial client. Discord's Terms of Service do not permit
-  third-party clients and automated user accounts can be terminated. Use it with
-  that risk understood, and prefer a bot token for anything long-lived.
-- Voice channels, threads, file uploads and message search are not implemented.
-  Voice channels are intentionally hidden rather than shown as dead UI.
-- Channel lists are not permission-filtered: the client shows every text channel
-  the token can see, because computed per-channel permissions are not part of the
-  channel object returned by REST.
-- Rate limits are handled per request (429 + `retry_after`); Fluenta does not do
-  full bucket pre-emption.
+- Modding Discord violates its Terms of Service; accounts have been actioned for
+  client mods. That risk is yours, and it is the same risk Vencord/BetterDiscord
+  users take.
+- Discord updates replace `resources/app.asar` and revert the patch — re-run
+  `npm run mod:install` after an update (or if `mod:status` says `needs-repair`).
+- Plugin internals depend on Discord's private webpack modules. Those change
+  between updates; each plugin is written defensively and reports failures in the
+  panel instead of breaking the client.
+- The mod is verified by unit/integration tests and compiles cleanly, but it was
+  not launched against a live Discord install from this Linux build environment —
+  see `npm run mod:status` and the panel log after installing to confirm on your
+  machine.
+- Voice, file uploads and search are not implemented in either part.

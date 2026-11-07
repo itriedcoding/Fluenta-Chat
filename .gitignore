@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist-ssr/
+mod/dist/
+mod/dist-tests/
 *.local
 .env
 .env.*
