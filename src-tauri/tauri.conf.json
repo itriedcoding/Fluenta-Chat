@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Fluenta",
+  "version": "1.0.0",
+  "identifier": "app.fluenta.client",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Fluenta",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 880,
+        "minHeight": 560,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "backgroundColor": "#0b0d13"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' https://cdn.discordapp.com https://media.discordapp.net data:; media-src 'self' https://cdn.discordapp.com https://media.discordapp.net blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' https://discord.com wss://gateway.discord.gg wss://*.discord.gg ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Fluenta — custom Discord client",
+    "longDescription": "A custom Discord client for Windows and Android built on the official REST API and Gateway."
+  },
+  "plugins": {
+    "http": {
+      "scope": [
+        "https://discord.com/*",
+        "https://cdn.discordapp.com/*",
+        "https://media.discordapp.net/*"
+      ]
+    }
+  }
+}
