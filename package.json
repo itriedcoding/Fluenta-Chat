@@ -1,9 +1,9 @@
 {
   "name": "fluenta",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
-  "description": "Fluenta — a custom Discord client for Windows and Android (live REST + Gateway, no mocks)",
+  "description": "Fluenta — a Discord client mod for Windows (Vencord-style), no token or bot required",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -20,7 +20,8 @@
     "windows:dev": "tauri dev",
     "windows:build": "tauri build",
     "android:build": "npm run build && cap sync android",
-    "android:open": "cap open android"
+    "android:open": "cap open android",
+    "mod:exe": "node tools/build-sea.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^7.0.0",
@@ -41,6 +42,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
     "typescript": "~5.7.0",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "postject": "^1.0.0-alpha.6"
   }
 }

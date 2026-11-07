@@ -33,3 +33,5 @@ android/app/src/main/assets/capacitor.plugins.json
 # Editors
 .vscode/
 .idea/
+
+release/

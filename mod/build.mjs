@@ -53,6 +53,21 @@ await build({
   external: ['@electron/asar'],
 })
 
+// Same CLI with every dependency inlined, for the single-executable build
+// (a SEA cannot require anything that is not embedded).
+await build({
+  ...base,
+  entryPoints: [join(modDir, 'src/cli.ts')],
+  outfile: join(dist, 'sea-main.cjs'),
+  platform: 'node',
+  format: 'cjs',
+  target: 'node20',
+  // Electron-only builtin used by asar's fs wrapper; it is wrapped in try/catch
+  // at runtime, so leaving it external is safe and keeps the bundle buildable.
+  external: ['original-fs'],
+  banner: { js: "process.env.FLUENTA_SEA = '1'" },
+})
+
 console.log('Built mod/dist/{desktop.js, renderer.js, cli.cjs}')
 
 if (withTests) {
