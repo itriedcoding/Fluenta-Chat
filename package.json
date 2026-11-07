@@ -1,7 +1,7 @@
 {
   "name": "fluenta",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "type": "module",
   "description": "Fluenta — a Discord client mod for Windows (Vencord-style), no token or bot required",
   "scripts": {

@@ -1,0 +1,38 @@
+plugins {
+    id 'com.android.application' version '8.7.2'
+}
+
+android {
+    namespace 'app.fluenta.xposed'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'app.fluenta.xposed'
+        minSdk 24
+        targetSdk 35
+        versionCode 14
+        versionName '1.4.0'
+    }
+
+    // The module APK is scanned by LSPosed at install time; keep it small and
+    // unpacked so the manager can read the bundle straight out of the archive.
+    androidResources {
+        noCompress 'js'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
+
+dependencies {
+    // Xposed API is provided by LSPosed at runtime; never packaged.
+    compileOnly files('libs/xposed-api-82.jar')
+}

@@ -5,7 +5,8 @@ patches the Discord you already use and are already signed in to — **there is 
 token to paste, no bot account, and no second account**.
 
 - **Windows** — patches the installed Discord desktop app (`app.asar`).
-- **Android** — loads Discord's web client with the same mod bundle injected.
+- **Android** — the same mod bundle inside Discord, either in the WebView app
+  (no root) or as an LSPosed module on rooted devices.
 
 ![Fluenta](public/icon.png)
 
@@ -52,6 +53,24 @@ bytecode, so a JavaScript mod cannot attach to it without root/LSPosed or
 re-signing the APK (which breaks login and updates). The Android build therefore
 runs Discord's web client in a WebView and injects the identical renderer bundle
 — same plugins, same code path, no root required.
+
+### Rooted devices: the LSPosed module
+
+`Fluenta-LSPosed-<version>.apk` attaches to Discord's own process instead of
+running a second app:
+
+1. Install the APK, open **LSPosed Manager → Modules**, enable **Fluenta**.
+2. Scope it to **Discord** (the module declares `com.discord` as its scope).
+3. Force stop Discord, then launch it. LSPosed → **Logs** shows
+   `Fluenta: hooks active (flags, activities, webviews)`.
+
+Inside Discord it clears `FLAG_SECURE` (so screenshots and screen recording
+work again), injects the bundle into Discord's WebView surfaces, and logs every
+hook. Each hook is individually guarded, so a Discord update cannot take the app
+down.
+
+The Xposed API is `de.robv.android.xposed:api:82`, compile-only and vendored in
+`lsposed/libs/` — LSPosed provides the real classes at runtime.
 
 ## How it works
 
@@ -120,6 +139,7 @@ Windows and publishes a release tagged `v<version>`:
 | --- | --- |
 | `Fluenta-Mod-Setup.exe` | Interactive Windows installer (single executable) |
 | `Fluenta-<version>-android.apk` | Android app with the mod injected |
+| `Fluenta-LSPosed-<version>.apk` | LSPosed module for rooted devices |
 | `desktop.js`, `renderer.js`, `cli.cjs` | The mod bundles, for manual/CLI installs |
 
 The mod reads that release feed itself: **Check for mod updates** in the panel,
@@ -138,6 +158,7 @@ mod/
   tests/             injector + patcher tests
 tools/build-sea.mjs  packages the installer as a Windows .exe
 android-mod/         Android WebView shell that injects the same mod bundle
+lsposed/             Xposed/LSPosed module that hooks Discord's own process
 src/                 older standalone client kept for reference (not shipped)
 ```
 
@@ -149,9 +170,14 @@ src/                 older standalone client kept for reference (not shipped)
   (or `status`, which reports `needs-repair`).
 - Plugin internals depend on Discord's private webpack modules; each plugin fails
   gracefully and reports in the panel.
-- **Android runs Discord's web client**, not the native app (see above).
+- **Android runs Discord's web client** in the non-root build (see above).
   Screen sharing and push-to-talk behave as they do in Discord's web build.
   The APK is signed with a debug key, so update it by installing the new release
   over the old one.
+- **The LSPosed module cannot run the full JS mod inside Discord's native UI.**
+  That UI is React Native on Hermes bytecode; evaluating arbitrary JavaScript
+  there needs a native bridge into `libhermes.so` (what Bunny/Revenge ship). The
+  module does the parts that work from Java: WebView bundle injection, screenshot
+  unlock, and guarded logging.
 - The installer is unsigned, so Windows SmartScreen will warn until it is signed.
 - Voice, uploads and search are not implemented.

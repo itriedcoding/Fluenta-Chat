@@ -39,3 +39,6 @@ android-mod/.gradle/
 android-mod/build/
 android-mod/app/build/
 android-mod/local.properties
+lsposed/.gradle/
+lsposed/build/
+lsposed/local.properties

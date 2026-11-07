@@ -1,6 +1,6 @@
 [package]
 name = "fluenta"
-version = "1.3.0"
+version = "1.4.0"
 description = "Fluenta — a custom Discord client"
 authors = ["Fluenta"]
 edition = "2021"

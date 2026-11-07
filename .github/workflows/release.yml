@@ -1,8 +1,8 @@
 name: Release
 
-# Builds the mod installer for Windows plus the mod bundles, and publishes them
-# to the Releases page. Runs on every push to main so the updater in the mod and
-# the installer always point at current binaries.
+# Builds every Fluenta artifact (Windows installer, Android app, LSPosed module,
+# mod bundles) and publishes them to the Releases page. Runs on every push to
+# main so the updater in the mod always points at current binaries.
 on:
   push:
     branches: [main]
@@ -82,12 +82,14 @@ jobs:
       - run: npm ci
       - run: npm run mod:build
       - name: Build mod bundle for Android
-        run: cp mod/dist/renderer.js android-mod/app/src/main/assets/fluenta.js
+        run: |
+          cp mod/dist/renderer.js android-mod/app/src/main/assets/fluenta.js
+          cp mod/dist/renderer.js lsposed/src/main/assets/fluenta.js
       - name: Install Android SDK
         run: |
           set -euo pipefail
           SDK="$HOME/android-sdk"
-          if [ -d "$ANDROID_HOME" ]; then SDK="$ANDROID_HOME"; fi
+          if [ -n "${ANDROID_HOME:-}" ] && [ -d "$ANDROID_HOME" ]; then SDK="$ANDROID_HOME"; fi
           mkdir -p "$SDK"
           if [ ! -d "$SDK/cmdline-tools/latest" ]; then
             curl -sSLo /tmp/cmdline.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
@@ -98,15 +100,21 @@ jobs:
           yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
           "$SDK/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
           echo "sdk.dir=$SDK" > android-mod/local.properties
+          echo "sdk.dir=$SDK" > lsposed/local.properties
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
-      - name: Build APK
+      - name: Build Android app
         working-directory: android-mod
         run: ./gradlew assembleDebug --no-daemon
-      - name: Collect APK
+      - name: Build LSPosed module
+        working-directory: lsposed
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Collect APKs
         run: |
           mkdir -p release-artifacts
           cp android-mod/app/build/outputs/apk/debug/app-debug.apk \
              "release-artifacts/Fluenta-${{ needs.version.outputs.value }}-android.apk"
+          cp lsposed/build/outputs/apk/debug/FluentaLSPosed-debug.apk \
+             "release-artifacts/Fluenta-LSPosed-${{ needs.version.outputs.value }}.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android
@@ -148,18 +156,20 @@ jobs:
           tag_name: v${{ needs.version.outputs.value }}
           name: Fluenta mod v${{ needs.version.outputs.value }}
           body: |
-            Fluenta is a Discord client mod — run `Fluenta-Mod-Setup.exe`, pick
-            install, then restart Discord. No account token or bot token needed.
+            Fluenta is a Discord client mod — no account token, no bot token, no
+            second account.
 
-            - **Windows**: `Fluenta-Mod-Setup.exe` (interactive) — also accepts
-              `install`, `uninstall`, `update`, `status` arguments. It patches the
-              Discord you already have installed.
-            - **Android**: `Fluenta-<version>-android.apk` — sideload it, sign in
-              normally. It runs Discord's web client with the same mod bundle
-              injected (Discord's native app is Hermes bytecode and cannot take a
-              JS mod without root/LSPosed, so it is not used).
-            - **Manual install**: `desktop.js` + `renderer.js` + `cli.cjs` next to
-              `mod/dist/`, then `node cli.cjs install`.
+            **Windows** — run `Fluenta-Mod-Setup.exe`, choose install, restart
+            Discord. It patches the Discord you already have.
+
+            **Android** — `Fluenta-<version>-android.apk` runs Discord's web
+            client with the same mod bundle injected; sign in normally.
+            Rooted devices can instead use `Fluenta-LSPosed-<version>.apk`
+            (enable in LSPosed Manager, scope to Discord). Its WebView + screenshot
+            hooks run inside Discord's own process.
+
+            **Manual install** — `desktop.js` + `renderer.js` + `cli.cjs` next to
+            `mod/dist/`, then `node cli.cjs install`.
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: release-artifacts/*
