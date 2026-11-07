@@ -1,8 +1,11 @@
 # Fluenta
 
-A **Discord client mod for Windows**, in the style of Vencord. It patches the
-Discord desktop app you already have installed and signed in — **there is no
-token to paste, no bot account, and no second client**.
+A **Discord client mod for Windows and Android**, in the style of Vencord. It
+patches the Discord you already use and are already signed in to — **there is no
+token to paste, no bot account, and no second account**.
+
+- **Windows** — patches the installed Discord desktop app (`app.asar`).
+- **Android** — loads Discord's web client with the same mod bundle injected.
 
 ![Fluenta](public/icon.png)
 
@@ -32,6 +35,23 @@ Fluenta-Mod-Setup.exe update       # pull the newest mod build
 Fluenta-Mod-Setup.exe status
 Fluenta-Mod-Setup.exe install --dir "C:\path\to\Discord\resources"
 ```
+
+## Install on Android
+
+Download `Fluenta-<version>-android.apk` from
+[Releases](https://github.com/itriedcoding/Fluenta-Chat/releases/latest), open
+the file on the phone and allow installing from your browser/file manager when
+Android asks. Sign in with your normal Discord account — there is no token field
+anywhere.
+
+The **F** button (or **Ctrl+Shift+F** with a keyboard) opens the panel, same as
+on desktop.
+
+Android's Discord app is not patched: it is React Native running Hermes
+bytecode, so a JavaScript mod cannot attach to it without root/LSPosed or
+re-signing the APK (which breaks login and updates). The Android build therefore
+runs Discord's web client in a WebView and injects the identical renderer bundle
+— same plugins, same code path, no root required.
 
 ## How it works
 
@@ -99,6 +119,7 @@ Windows and publishes a release tagged `v<version>`:
 | Asset | What it is |
 | --- | --- |
 | `Fluenta-Mod-Setup.exe` | Interactive Windows installer (single executable) |
+| `Fluenta-<version>-android.apk` | Android app with the mod injected |
 | `desktop.js`, `renderer.js`, `cli.cjs` | The mod bundles, for manual/CLI installs |
 
 The mod reads that release feed itself: **Check for mod updates** in the panel,
@@ -116,6 +137,7 @@ mod/
   src/renderer/      webpack patcher, plugin registry, panel UI, plugins
   tests/             injector + patcher tests
 tools/build-sea.mjs  packages the installer as a Windows .exe
+android-mod/         Android WebView shell that injects the same mod bundle
 src/                 older standalone client kept for reference (not shipped)
 ```
 
@@ -127,7 +149,9 @@ src/                 older standalone client kept for reference (not shipped)
   (or `status`, which reports `needs-repair`).
 - Plugin internals depend on Discord's private webpack modules; each plugin fails
   gracefully and reports in the panel.
-- **Android is not supported.** Patching Discord's Android build requires
-  re-signing its APK, which a mod cannot do — so no APK is published.
+- **Android runs Discord's web client**, not the native app (see above).
+  Screen sharing and push-to-talk behave as they do in Discord's web build.
+  The APK is signed with a debug key, so update it by installing the new release
+  over the old one.
 - The installer is unsigned, so Windows SmartScreen will warn until it is signed.
 - Voice, uploads and search are not implemented.

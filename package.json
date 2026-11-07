@@ -1,7 +1,7 @@
 {
   "name": "fluenta",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "type": "module",
   "description": "Fluenta — a Discord client mod for Windows (Vencord-style), no token or bot required",
   "scripts": {
@@ -21,7 +21,8 @@
     "windows:build": "tauri build",
     "android:build": "npm run build && cap sync android",
     "android:open": "cap open android",
-    "mod:exe": "node tools/build-sea.mjs"
+    "mod:exe": "node tools/build-sea.mjs",
+    "android:mod": "node mod/build.mjs && cp mod/dist/renderer.js android-mod/app/src/main/assets/fluenta.js"
   },
   "dependencies": {
     "@capacitor/core": "^7.0.0",

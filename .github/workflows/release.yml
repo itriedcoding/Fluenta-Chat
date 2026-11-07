@@ -66,8 +66,55 @@ jobs:
           if-no-files-found: error
           path: release-artifacts/*
 
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run mod:build
+      - name: Build mod bundle for Android
+        run: cp mod/dist/renderer.js android-mod/app/src/main/assets/fluenta.js
+      - name: Install Android SDK
+        run: |
+          set -euo pipefail
+          SDK="$HOME/android-sdk"
+          if [ -d "$ANDROID_HOME" ]; then SDK="$ANDROID_HOME"; fi
+          mkdir -p "$SDK"
+          if [ ! -d "$SDK/cmdline-tools/latest" ]; then
+            curl -sSLo /tmp/cmdline.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q /tmp/cmdline.zip -d /tmp/cmdline
+            mkdir -p "$SDK/cmdline-tools"
+            mv /tmp/cmdline/cmdline-tools "$SDK/cmdline-tools/latest"
+          fi
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          echo "sdk.dir=$SDK" > android-mod/local.properties
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+      - name: Build APK
+        working-directory: android-mod
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Collect APK
+        run: |
+          mkdir -p release-artifacts
+          cp android-mod/app/build/outputs/apk/debug/app-debug.apk \
+             "release-artifacts/Fluenta-${{ needs.version.outputs.value }}-android.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          if-no-files-found: error
+          path: release-artifacts/*.apk
+
   publish:
-    needs: [version, installer, mod]
+    needs: [version, installer, mod, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -105,7 +152,12 @@ jobs:
             install, then restart Discord. No account token or bot token needed.
 
             - **Windows**: `Fluenta-Mod-Setup.exe` (interactive) — also accepts
-              `install`, `uninstall`, `update`, `status` arguments.
+              `install`, `uninstall`, `update`, `status` arguments. It patches the
+              Discord you already have installed.
+            - **Android**: `Fluenta-<version>-android.apk` — sideload it, sign in
+              normally. It runs Discord's web client with the same mod bundle
+              injected (Discord's native app is Hermes bytecode and cannot take a
+              JS mod without root/LSPosed, so it is not used).
             - **Manual install**: `desktop.js` + `renderer.js` + `cli.cjs` next to
               `mod/dist/`, then `node cli.cjs install`.
           generate_release_notes: true

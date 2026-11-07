@@ -35,3 +35,7 @@ android/app/src/main/assets/capacitor.plugins.json
 .idea/
 
 release/
+android-mod/.gradle/
+android-mod/build/
+android-mod/app/build/
+android-mod/local.properties

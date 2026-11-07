@@ -1,0 +1,33 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'app.fluenta.android'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'app.fluenta.android'
+        minSdk 24
+        targetSdk 35
+        versionCode 13
+        versionName '1.3.0'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    // The mod bundle is injected verbatim into the WebView, so it must not be
+    // compressed or otherwise rewritten.
+    androidResources {
+        noCompress 'js'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
