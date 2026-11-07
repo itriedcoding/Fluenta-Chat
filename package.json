@@ -14,7 +14,7 @@
     "mod:install": "npm run mod:build && node mod/dist/cli.cjs install",
     "mod:uninstall": "node mod/dist/cli.cjs uninstall",
     "mod:status": "node mod/dist/cli.cjs status",
-    "mod:test": "node mod/build.mjs --tests && node --test mod/dist-tests/",
+    "mod:test": "node mod/build.mjs --tests && node --test \"mod/dist-tests/**/*.test.cjs\"",
     "mod:typecheck": "tsc --noEmit -p mod/tsconfig.json",
     "tauri": "tauri",
     "windows:dev": "tauri dev",
