@@ -36,6 +36,8 @@ No network interception, no separate account, no data leaves your machine.
 
 ### Install
 
+Download the latest release, or build it yourself:
+
 ```bash
 npm install
 npm run mod:install     # build + patch every Discord install it finds
@@ -92,12 +94,43 @@ npm run mod:build       # mod/dist/{desktop.js,renderer.js,cli.cjs}
 npm run mod:typecheck   # tsc over mod/
 npm run mod:test        # unit tests
 npm run mod:install     # rebuild + patch
+node mod/dist/cli.cjs update   # pull the newest mod build from Releases
 ```
 
 `mod:test` covers the injector end-to-end against a real `app.asar` built with
 `@electron/asar` (install → patched `index.js` → backup → uninstall restores the
 original bytes) and the webpack patcher (module discovery by export shape,
 throwing modules, Flux subscribe/unsubscribe).
+
+---
+
+## Releases and auto-update
+
+Every push to `main` runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds
+and publishes a GitHub Release tagged `v<version>` containing:
+
+| Asset | Built from |
+| --- | --- |
+| `Fluenta_<version>_x64-setup.exe` | Tauri 2 Windows installer (NSIS) |
+| `Fluenta_<version>_x64_en-US.msi` | Tauri 2 MSI package |
+| `Fluenta-<version>-android.apk` | Capacitor 7 Gradle build |
+| `desktop.js`, `renderer.js`, `cli.cjs` | The mod bundles |
+
+Both apps read that release feed over the public GitHub API — no mock data, no
+bundled version list:
+
+- **Mobile / web client** — `src/lib/updater.ts` asks
+  `api.github.com/repos/itriedcoding/Fluenta-Chat/releases/latest`, compares it
+  with the running version, and shows a dismissible banner (plus **Settings →
+  Updates → Check for updates**) with the `.exe` or `.apk` asset for the current
+  platform.
+- **Mod** — the panel's *Check for mod updates* opens the newest release, and
+  `node mod/dist/cli.cjs update` downloads the latest `desktop.js` / `renderer.js`
+  and re-patches Discord in place.
+
+Updates are notify-and-install rather than silent self-modification: on Windows
+you run the new installer, on Android you tap the APK and confirm. That keeps the
+update path honest about what it is doing.
 
 ---
 
@@ -152,4 +185,7 @@ tools/gen-icons.mjs  dependency-free PNG/ICO icon generator
   not launched against a live Discord install from this Linux build environment —
   see `npm run mod:status` and the panel log after installing to confirm on your
   machine.
+- The Windows installer and APK are produced by GitHub Actions on real Windows and
+  Android toolchains. If Actions is disabled on the fork/repository, enable it
+  under **Settings → Actions** or the release job will not run.
 - Voice, file uploads and search are not implemented in either part.

@@ -1,0 +1,123 @@
+name: Release
+
+# Builds the Windows installer, the Android APK and the mod bundles, then
+# publishes them to the Releases page. Runs on every push to main so the
+# "latest release" the in-app updater reads is always current.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.read.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: read
+        run: echo "value=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+      - run: npm run icons
+      - name: Build Tauri app
+        run: npm run tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - name: Package APK
+        run: |
+          mkdir -p release-artifacts
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             "release-artifacts/Fluenta-${{ needs.version.outputs.value }}-android.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          if-no-files-found: error
+          path: release-artifacts/*.apk
+
+  mod:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run mod:typecheck
+      - run: npm run mod:test
+      - name: Package mod
+        run: |
+          mkdir -p release-artifacts
+          cp mod/dist/desktop.js mod/dist/renderer.js mod/dist/cli.cjs release-artifacts/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mod
+          if-no-files-found: error
+          path: release-artifacts/*
+
+  publish:
+    needs: [version, windows, android, mod]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-artifacts
+          find artifacts -type f -exec cp {} release-artifacts/ \;
+          ls -l release-artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version.outputs.value }}
+          name: Fluenta v${{ needs.version.outputs.value }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release-artifacts/*

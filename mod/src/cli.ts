@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { detectInstalls, type DiscordInstall } from './shared/paths'
 import {
   asarFor,
@@ -11,6 +11,8 @@ import {
   patchDirFor,
   uninstallFrom,
 } from './injector/install'
+import { downloadTo, fetchLatestRelease } from './injector/update'
+import { MOD_VERSION } from './shared/version'
 
 const args = process.argv.slice(2)
 const command = args[0] ?? 'status'
@@ -20,7 +22,7 @@ const customDir = dirArgIndex >= 0 ? args[dirArgIndex + 1] : undefined
 
 // Bundled as CommonJS: the build output sits next to desktop.js / renderer.js.
 const distDir = __dirname
-const version = '1.0.0'
+const version = MOD_VERSION
 
 const describe = (install: DiscordInstall): string => {
   if (isInstalled(install)) return 'installed'
@@ -100,23 +102,72 @@ function uninstall() {
   }
 }
 
-switch (command) {
-  case 'install':
-    install()
-    break
-  case 'uninstall':
-    uninstall()
-    break
-  case 'status':
-    status()
-    break
-  default:
-    console.log(`Fluenta mod injector
+/** Pulls the newest desktop.js/renderer.js from the latest GitHub release. */
+async function update() {
+  const release = await fetchLatestRelease()
+  if (!release) {
+    console.error('No Fluenta release published yet — nothing to update to.')
+    process.exitCode = 1
+    return
+  }
+
+  const latest = release.tag_name.replace(/^v/i, '')
+  console.log(`Latest release: ${release.tag_name} (${release.published_at})`)
+
+  for (const name of ['desktop.js', 'renderer.js']) {
+    const asset = release.assets.find((item) => item.name === name)
+    if (!asset) {
+      console.error(`Release ${latest} does not include ${name}; aborting.`)
+      process.exitCode = 1
+      return
+    }
+    console.log(`Downloading ${name} (${asset.size} bytes)…`)
+    await downloadTo(asset.browser_download_url, join(distDir, name))
+  }
+  console.log('Downloaded the latest mod build.')
+
+  const installs = targets()
+  if (installs.length === 0) {
+    console.log('No Discord install found; files are updated for the next install.')
+    return
+  }
+
+  for (const target of installs) {
+    if (isInstalled(target)) uninstallFrom(target)
+    const result = installInto(target, { distDir, version: latest })
+    console.log(`${target.label}: ${result.status} — ${result.message}`)
+  }
+  console.log('Restart Discord to run the updated mod.')
+}
+
+async function main() {
+  switch (command) {
+    case 'install':
+      install()
+      break
+    case 'uninstall':
+      uninstall()
+      break
+    case 'update':
+      await update()
+      break
+    case 'status':
+      status()
+      break
+    default:
+      console.log(`Fluenta mod injector v${MOD_VERSION}
 
 Usage:
   node mod/dist/cli.cjs status
   node mod/dist/cli.cjs install [--dry-run] [--dir <resources path>]
   node mod/dist/cli.cjs uninstall [--dir <resources path>]
+  node mod/dist/cli.cjs update [--dir <resources path>]
 `)
-    if (command !== 'help' && command !== '--help' && command !== '-h') process.exitCode = 1
+      if (command !== 'help' && command !== '--help' && command !== '-h') process.exitCode = 1
+  }
 }
+
+void main().catch((error) => {
+  console.error((error as Error).message)
+  process.exitCode = 1
+})

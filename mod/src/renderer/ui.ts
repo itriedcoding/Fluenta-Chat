@@ -9,6 +9,9 @@ import {
 } from './plugins/registry'
 import { DEFAULT_CSS, applyTheme, THEME_KEY } from './plugins/theme'
 import { clearMessageLog, getMessageLog } from './plugins/messageLogger'
+import { MOD_VERSION } from '../shared/version'
+import { checkModUpdate } from './updater'
+import { RELEASES_URL } from './updater'
 
 const PANEL_CSS = `
 :host { all: initial; }
@@ -79,7 +82,7 @@ export function mountPanel(): void {
     <button class="fab" title="Fluenta (Ctrl+Shift+F)">F</button>
     <section class="panel" hidden>
       <header class="head">
-        <h1>Fluenta</h1><span class="ver">mod 1.0.0</span>
+        <h1>Fluenta</h1><span class="ver">mod ${MOD_VERSION}</span>
         <span class="spacer"></span>
         <button class="icon-btn" data-action="close" title="Close">✕</button>
       </header>
@@ -187,6 +190,32 @@ export function mountPanel(): void {
     note.textContent =
       'Plugins run inside your own Discord client and only touch what is on this device. Toggling one applies immediately.'
     body.appendChild(note)
+
+    const updateRow = document.createElement('div')
+    updateRow.className = 'row'
+    const updateButton = document.createElement('button')
+    updateButton.className = 'btn'
+    updateButton.textContent = 'Check for mod updates'
+    updateButton.addEventListener('click', () => {
+      updateButton.disabled = true
+      updateButton.textContent = 'Checking…'
+      void checkModUpdate()
+        .then((result) => {
+          updateButton.textContent = result
+            ? `Update available: ${result.latest}`
+            : 'Up to date'
+          if (result) window.open(result.url, '_blank')
+        })
+        .catch(() => {
+          updateButton.textContent = 'Open releases page'
+          window.open(RELEASES_URL, '_blank')
+        })
+        .finally(() => {
+          updateButton.disabled = false
+        })
+    })
+    updateRow.appendChild(updateButton)
+    body.appendChild(updateRow)
   }
 
   function renderTheme() {

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../lib/store'
 import { platformName } from '../lib/transport'
+import UpdateBanner from './UpdateBanner'
 
 export default function Login() {
   const login = useApp((s) => s.login)
@@ -76,6 +77,7 @@ export default function Login() {
           Running as <strong>{platformName()}</strong> · live Discord REST + Gateway
         </div>
       </form>
+      <UpdateBanner />
     </div>
   )
 }

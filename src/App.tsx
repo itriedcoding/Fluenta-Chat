@@ -6,6 +6,7 @@ import ChannelSidebar from './components/ChannelSidebar'
 import Chat from './components/Chat'
 import MemberList from './components/MemberList'
 import SettingsModal from './components/SettingsModal'
+import UpdateBanner from './components/UpdateBanner'
 import { platformName } from './lib/transport'
 
 function Splash({ label }: { label: string }) {
@@ -69,6 +70,7 @@ export default function App() {
       {gateway === 'reconnecting' && (
         <div className="net-banner">Connection lost — reconnecting…</div>
       )}
+      <UpdateBanner />
       {error && (
         <div className="toast" role="alert" onClick={clearError}>
           {error}

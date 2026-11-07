@@ -1,7 +1,7 @@
 {
   "name": "fluenta",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Fluenta — a custom Discord client for Windows and Android (live REST + Gateway, no mocks)",
   "scripts": {
