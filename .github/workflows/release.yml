@@ -78,15 +78,23 @@ jobs:
           mkdir -p release-artifacts
           find artifacts -type f -exec cp {} release-artifacts/ \;
           ls -l release-artifacts
-      - name: Remove releases that shipped the old standalone client
+      - name: Delete older releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT: v${{ needs.version.outputs.value }}
+          REPO: ${{ github.repository }}
         run: |
-          gh release list --limit 100 --json tagName -q '.[].tagName' | while read -r tag; do
-            if [ -n "$tag" ] && [ "$tag" != "v${{ needs.version.outputs.value }}" ]; then
-              echo "Deleting stale release $tag"
-              gh release delete "$tag" --yes --cleanup-tag || true
-            fi
+          set -euo pipefail
+          echo "Keeping $CURRENT, pruning everything older"
+          ids=$(gh api "repos/$REPO/releases?per_page=100" --jq ".[] | select(.tag_name != env.CURRENT) | .id")
+          for id in $ids; do
+            echo "Deleting release id $id"
+            gh api -X DELETE "repos/$REPO/releases/$id"
+          done
+          tags=$(gh api "repos/$REPO/git/refs/tags" --jq '.[].ref' | sed 's#refs/tags/##' | grep -v "^${CURRENT}$" || true)
+          for tag in $tags; do
+            echo "Deleting tag $tag"
+            gh api -X DELETE "repos/$REPO/git/refs/tags/$tag" || true
           done
       - uses: softprops/action-gh-release@v2
         with:
