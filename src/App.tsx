@@ -49,11 +49,11 @@ export default function App() {
     document.title = selectedChannelId ? 'Fluenta' : 'Fluenta'
   }, [selectedChannelId])
 
-  if (status === 'idle' || (status === 'connecting' && !token)) {
+  if (!token) {
     return <Login />
   }
 
-  if (status === 'connecting' && token && !selectedChannelId) {
+  if (status === 'connecting' && !selectedChannelId) {
     return <Splash label="Connecting to Discord…" />
   }
 
